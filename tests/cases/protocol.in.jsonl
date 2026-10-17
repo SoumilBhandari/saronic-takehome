@@ -1,0 +1,6 @@
+not json
+[1, 2]
+
+{"command": "tick"}
+{"command": "fly", "parameters": {}}
+{"command": 7, "parameters": {}}

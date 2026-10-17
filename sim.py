@@ -21,7 +21,26 @@ class Simulation:
 
     def handle(self, line: str) -> dict:
         """Process one input line and return exactly one response envelope."""
-        raise NotImplementedError
+        try:
+            name, params = self._parse(line)
+            return {"status": "ok", "payload": self.COMMANDS[name](self, params)}
+        except CommandError as e:
+            return {"status": "error", "payload": {"message": str(e)}}
+
+    def _parse(self, line: str) -> tuple[str, dict]:
+        """Split a raw line into a known command name and its parameters."""
+        try:
+            message = json.loads(line)
+        except json.JSONDecodeError:
+            raise CommandError("invalid JSON")
+        if not isinstance(message, dict):
+            raise CommandError("command must be a JSON object")
+        if not isinstance(message.get("parameters"), dict):
+            raise CommandError("parameters must be an object")
+        name = message.get("command")
+        if not isinstance(name, str) or name not in self.COMMANDS:
+            raise CommandError(f"unknown command: {name}")
+        return name, message["parameters"]
 
     def init(self, params: dict) -> dict:
         """Build the world at tick 0 from travel_times and vessels."""
@@ -51,7 +70,8 @@ class Simulation:
 def main() -> None:
     sim = Simulation()
     for line in sys.stdin:
-        print(json.dumps(sim.handle(line)), flush=True)
+        if line.strip():  # blank lines are not commands
+            print(json.dumps(sim.handle(line)), flush=True)
 
 
 if __name__ == "__main__":

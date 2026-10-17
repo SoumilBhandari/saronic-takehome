@@ -1,0 +1,5 @@
+{"status": "error", "payload": {"message": "invalid JSON"}}
+{"status": "error", "payload": {"message": "command must be a JSON object"}}
+{"status": "error", "payload": {"message": "parameters must be an object"}}
+{"status": "error", "payload": {"message": "unknown command: fly"}}
+{"status": "error", "payload": {"message": "unknown command: 7"}}
