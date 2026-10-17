@@ -82,7 +82,13 @@ class Simulation:
 
     def tick(self, params: dict) -> dict:
         """Commit the planned state, advance one tick, and resolve arrivals."""
-        raise NotImplementedError
+        self.committed = self.planned
+        self.committed["tick"] += 1
+        for vessel_id, vessel in self.committed["vessels"].items():
+            if vessel["state"] == "transit" and vessel["arrives_at_tick"] == self.committed["tick"]:
+                self.committed["vessels"][vessel_id] = {"state": "idle", "location": vessel["to"]}
+        self.planned = copy.deepcopy(self.committed)
+        return self.planned
 
     # Command name -> handler. Adding a command means adding one line here.
     COMMANDS = {
