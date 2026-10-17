@@ -6,6 +6,7 @@ response per command to stdout.
 Usage: python3 sim.py < commands.jsonl
 """
 
+import copy
 import json
 import sys
 
@@ -16,6 +17,7 @@ class CommandError(Exception):
 
 class Simulation:
     def __init__(self) -> None:
+        self.travel_times: list[list[int]] = []  # travel_times[i][j] = ticks from i to j
         self.committed: dict | None = None  # world state at the current tick
         self.planned: dict | None = None  # committed state plus commands since the last tick
 
@@ -23,6 +25,8 @@ class Simulation:
         """Process one input line and return exactly one response envelope."""
         try:
             name, params = self._parse(line)
+            if self.committed is None and name != "init":
+                raise CommandError("simulation not initialized")
             return {"status": "ok", "payload": self.COMMANDS[name](self, params)}
         except CommandError as e:
             return {"status": "error", "payload": {"message": str(e)}}
@@ -44,11 +48,17 @@ class Simulation:
 
     def init(self, params: dict) -> dict:
         """Build the world at tick 0 from travel_times and vessels."""
-        raise NotImplementedError
+        if self.committed is not None:
+            raise CommandError("simulation already initialized")
+        self.travel_times = params["travel_times"]
+        vessels = {v["id"]: {"state": "idle", "location": v["location"]} for v in params["vessels"]}
+        self.committed = {"tick": 0, "vessels": vessels}
+        self.planned = copy.deepcopy(self.committed)
+        return self.planned
 
     def get_state(self, params: dict) -> dict:
         """Return the planned state."""
-        raise NotImplementedError
+        return self.planned
 
     def set_destination(self, params: dict) -> dict:
         """Send an idle vessel toward a location, replacing any earlier order this tick."""

@@ -1,0 +1,4 @@
+{"status": "error", "payload": {"message": "simulation not initialized"}}
+{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "idle", "location": 0}, "v2": {"state": "idle", "location": 2}}}}
+{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "idle", "location": 0}, "v2": {"state": "idle", "location": 2}}}}
+{"status": "error", "payload": {"message": "simulation already initialized"}}
