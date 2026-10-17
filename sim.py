@@ -30,6 +30,8 @@ class Simulation:
             return {"status": "ok", "payload": self.COMMANDS[name](self, params)}
         except CommandError as e:
             return {"status": "error", "payload": {"message": str(e)}}
+        except Exception as e:  # a bug or malformed input; keep running
+            return {"status": "error", "payload": {"message": f"internal error: {e!r}"}}
 
     def _parse(self, line: str) -> tuple[str, dict]:
         """Split a raw line into a known command name and its parameters."""
@@ -71,6 +73,8 @@ class Simulation:
             raise CommandError(f"vessel {vessel_id} is not idle")
         if not 0 <= destination < len(self.travel_times):
             raise CommandError(f"destination {destination} is out of range")
+        if destination == vessel["location"]:
+            raise CommandError(f"vessel {vessel_id} is already at location {destination}")
         self.planned["vessels"][vessel_id] = {
             "state": "transit",
             "from": vessel["location"],

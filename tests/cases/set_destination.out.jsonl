@@ -3,4 +3,5 @@
 {"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "transit", "from": 0, "to": 1, "arrives_at_tick": 4}, "v2": {"state": "idle", "location": 2}}}}
 {"status": "error", "payload": {"message": "unknown vessel v9"}}
 {"status": "error", "payload": {"message": "destination 5 is out of range"}}
+{"status": "error", "payload": {"message": "vessel v1 is already at location 0"}}
 {"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "transit", "from": 0, "to": 1, "arrives_at_tick": 4}, "v2": {"state": "idle", "location": 2}}}}
