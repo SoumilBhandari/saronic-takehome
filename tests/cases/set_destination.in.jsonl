@@ -1,0 +1,6 @@
+{"command": "init", "parameters": {"travel_times": [[0,4,7],[4,0,3],[7,3,0]], "vessels": [{"id": "v1", "location": 0}, {"id": "v2", "location": 2}]}}
+{"command": "set_destination", "parameters": {"vessel_id": "v1", "destination": 2}}
+{"command": "set_destination", "parameters": {"vessel_id": "v1", "destination": 1}}
+{"command": "set_destination", "parameters": {"vessel_id": "v9", "destination": 1}}
+{"command": "set_destination", "parameters": {"vessel_id": "v2", "destination": 5}}
+{"command": "get_state", "parameters": {}}

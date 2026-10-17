@@ -62,7 +62,23 @@ class Simulation:
 
     def set_destination(self, params: dict) -> dict:
         """Send an idle vessel toward a location, replacing any earlier order this tick."""
-        raise NotImplementedError
+        vessel_id = params["vessel_id"]
+        destination = params["destination"]
+        if vessel_id not in self.committed["vessels"]:
+            raise CommandError(f"unknown vessel {vessel_id}")
+        vessel = self.committed["vessels"][vessel_id]
+        if vessel["state"] != "idle":
+            raise CommandError(f"vessel {vessel_id} is not idle")
+        if not 0 <= destination < len(self.travel_times):
+            raise CommandError(f"destination {destination} is out of range")
+        self.planned["vessels"][vessel_id] = {
+            "state": "transit",
+            "from": vessel["location"],
+            "to": destination,
+            "arrives_at_tick": self.committed["tick"]
+            + self.travel_times[vessel["location"]][destination],
+        }
+        return self.planned
 
     def tick(self, params: dict) -> dict:
         """Commit the planned state, advance one tick, and resolve arrivals."""
