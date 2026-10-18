@@ -1,5 +1,5 @@
 {"status": "error", "payload": {"message": "simulation not initialized"}}
 {"status": "error", "payload": {"message": "internal error: KeyError('vessels')"}}
-{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "idle", "location": 0}, "v2": {"state": "idle", "location": 2}}}}
-{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "idle", "location": 0}, "v2": {"state": "idle", "location": 2}}}}
+{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "idle", "location": 0, "cargo": []}, "v2": {"state": "idle", "location": 2, "cargo": []}}, "cargo": []}}
+{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "idle", "location": 0, "cargo": []}, "v2": {"state": "idle", "location": 2, "cargo": []}}, "cargo": []}}
 {"status": "error", "payload": {"message": "simulation already initialized"}}

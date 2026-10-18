@@ -15,9 +15,19 @@ class CommandError(Exception):
     """A rejected command. Its message is returned as the error response."""
 
 
+def add_cargo(entries: list[dict], quantity: int, **key) -> None:
+    """Add units to the entry matching key (e.g. location and destination), creating it if needed."""
+    for entry in entries:
+        if all(entry[k] == v for k, v in key.items()):
+            entry["quantity"] += quantity
+            return
+    entries.append({**key, "quantity": quantity})
+
+
 class Simulation:
     def __init__(self) -> None:
         self.travel_times: list[list[int]] = []  # travel_times[i][j] = ticks from i to j
+        self.dock_throughput: list[int] = []  # max cargo operations per dock per tick
         self.committed: dict | None = None  # world state at the current tick
         self.planned: dict | None = None  # committed state plus commands since the last tick
 
@@ -48,13 +58,42 @@ class Simulation:
             raise CommandError(f"unknown command: {name}")
         return name, message["parameters"]
 
+    def _check_manifest(self, manifest: list[dict]) -> None:
+        """Reject the command if any cargo_manifest entry is out of range."""
+        n = len(self.travel_times)
+        for entry in manifest:
+            if not (
+                0 <= entry["location"] < n
+                and 0 <= entry["destination"] < n
+                and isinstance(entry["quantity"], int)
+                and entry["quantity"] > 0
+            ):
+                raise CommandError("invalid cargo_manifest entry")
+
+    def _add_manifest(self, manifest: list[dict]) -> None:
+        """Add cargo_manifest units to dock inventory in the committed state."""
+        for entry in manifest:
+            add_cargo(
+                self.committed["cargo"],
+                entry["quantity"],
+                location=entry["location"],
+                destination=entry["destination"],
+            )
+
     def init(self, params: dict) -> dict:
-        """Build the world at tick 0 from travel_times and vessels."""
+        """Build the world at tick 0 from travel_times, dock_throughput, vessels and cargo."""
         if self.committed is not None:
             raise CommandError("simulation already initialized")
         self.travel_times = params["travel_times"]
-        vessels = {v["id"]: {"state": "idle", "location": v["location"]} for v in params["vessels"]}
-        self.committed = {"tick": 0, "vessels": vessels}
+        self.dock_throughput = params["dock_throughput"]
+        manifest = params.get("cargo_manifest", [])
+        self._check_manifest(manifest)
+        vessels = {
+            v["id"]: {"state": "idle", "location": v["location"], "cargo": []}
+            for v in params["vessels"]
+        }
+        self.committed = {"tick": 0, "vessels": vessels, "cargo": []}
+        self._add_manifest(manifest)
         self.planned = copy.deepcopy(self.committed)
         return self.planned
 
@@ -81,16 +120,24 @@ class Simulation:
             "to": destination,
             "arrives_at_tick": self.committed["tick"]
             + self.travel_times[vessel["location"]][destination],
+            "cargo": self.planned["vessels"][vessel_id]["cargo"],
         }
         return self.planned
 
     def tick(self, params: dict) -> dict:
-        """Commit the planned state, advance one tick, and resolve arrivals."""
+        """Commit the planned state, advance one tick, resolve arrivals, and add new cargo."""
+        manifest = params.get("cargo_manifest", [])
+        self._check_manifest(manifest)  # before committing, so a rejected tick changes nothing
         self.committed = self.planned
         self.committed["tick"] += 1
         for vessel_id, vessel in self.committed["vessels"].items():
             if vessel["state"] == "transit" and vessel["arrives_at_tick"] == self.committed["tick"]:
-                self.committed["vessels"][vessel_id] = {"state": "idle", "location": vessel["to"]}
+                self.committed["vessels"][vessel_id] = {
+                    "state": "idle",
+                    "location": vessel["to"],
+                    "cargo": vessel["cargo"],
+                }
+        self._add_manifest(manifest)
         self.planned = copy.deepcopy(self.committed)
         return self.planned
 
