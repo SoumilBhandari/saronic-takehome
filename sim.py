@@ -180,39 +180,68 @@ class Simulation:
         }
         return self.planned
 
+    def _check_load(self, location: int, destination: int) -> dict:
+        """Return the planned dock entry a load would take from, or reject the load."""
+        entry = find_cargo(self.planned["cargo"], location=location, destination=destination)
+        if entry is None:
+            raise CommandError(f"no cargo for destination {destination} at location {location}")
+        return entry
+
+    def _move_load(self, vessel_id: str, entry: dict) -> None:
+        """Move one unit of a checked dock entry onto the vessel."""
+        destination = entry["destination"]
+        take_cargo(self.planned["cargo"], entry)
+        add_cargo(self.planned["vessels"][vessel_id]["cargo"], 1, destination=destination)
+
+    def _check_unload(self, vessel_id: str, destination: int) -> dict:
+        """Return the planned vessel entry an unload would take from, or reject the unload."""
+        entry = find_cargo(self.planned["vessels"][vessel_id]["cargo"], destination=destination)
+        if entry is None:
+            raise CommandError(f"vessel {vessel_id} has no cargo for destination {destination}")
+        return entry
+
+    def _move_unload(self, vessel_id: str, location: int, entry: dict) -> None:
+        """Move one unit of a checked vessel entry to the dock, delivering it if it has arrived."""
+        destination = entry["destination"]
+        take_cargo(self.planned["vessels"][vessel_id]["cargo"], entry)
+        if destination != location:  # cargo unloaded at its destination is delivered
+            add_cargo(self.planned["cargo"], 1, location=location, destination=destination)
+
     def load(self, params: dict) -> dict:
         """Move one unit of cargo from the dock onto a docked vessel."""
         vessel_id = params["vessel_id"]
-        destination = params["destination"]
         vessel = self._vessel(vessel_id)
         if vessel["state"] != "docked":
             raise CommandError(f"vessel {vessel_id} is not docked")
-        location = vessel["location"]
-        dock_cargo = self.planned["cargo"]
-        entry = find_cargo(dock_cargo, location=location, destination=destination)
-        if entry is None:
-            raise CommandError(f"no cargo for destination {destination} at location {location}")
-        self._use_operation(location)
-        take_cargo(dock_cargo, entry)
-        add_cargo(self.planned["vessels"][vessel_id]["cargo"], 1, destination=destination)
+        entry = self._check_load(vessel["location"], params["destination"])
+        self._use_operation(vessel["location"])
+        self._move_load(vessel_id, entry)
         return self.planned
 
     def unload(self, params: dict) -> dict:
         """Move one unit of cargo from a docked vessel to the dock, delivering it if it has arrived."""
         vessel_id = params["vessel_id"]
-        destination = params["destination"]
+        vessel = self._vessel(vessel_id)
+        if vessel["state"] != "docked":
+            raise CommandError(f"vessel {vessel_id} is not docked")
+        entry = self._check_unload(vessel_id, params["destination"])
+        self._use_operation(vessel["location"])
+        self._move_unload(vessel_id, vessel["location"], entry)
+        return self.planned
+
+    def swap(self, params: dict) -> dict:
+        """Load one unit and unload another as a single cargo operation."""
+        vessel_id = params["vessel_id"]
         vessel = self._vessel(vessel_id)
         if vessel["state"] != "docked":
             raise CommandError(f"vessel {vessel_id} is not docked")
         location = vessel["location"]
-        vessel_cargo = self.planned["vessels"][vessel_id]["cargo"]
-        entry = find_cargo(vessel_cargo, destination=destination)
-        if entry is None:
-            raise CommandError(f"vessel {vessel_id} has no cargo for destination {destination}")
+        # Both halves are checked before either moves: the swap is simultaneous.
+        load_entry = self._check_load(location, params["load_destination"])
+        unload_entry = self._check_unload(vessel_id, params["unload_destination"])
         self._use_operation(location)
-        take_cargo(vessel_cargo, entry)
-        if destination != location:  # cargo unloaded at its destination is delivered
-            add_cargo(self.planned["cargo"], 1, location=location, destination=destination)
+        self._move_load(vessel_id, load_entry)
+        self._move_unload(vessel_id, location, unload_entry)
         return self.planned
 
     def tick(self, params: dict) -> dict:
@@ -242,6 +271,7 @@ class Simulation:
         "undock": undock,
         "load": load,
         "unload": unload,
+        "swap": swap,
         "tick": tick,
     }
 

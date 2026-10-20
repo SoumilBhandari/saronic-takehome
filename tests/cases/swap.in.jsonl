@@ -1,0 +1,13 @@
+{"command": "init", "parameters": {"travel_times": [[0, 4, 7], [4, 0, 3], [7, 3, 0]], "dock_throughput": [2, 4, 1], "vessels": [{"id": "v1", "location": 0}, {"id": "v2", "location": 2}], "cargo_manifest": [{"location": 0, "destination": 2, "quantity": 1}, {"location": 0, "destination": 1, "quantity": 1}]}}
+{"command": "dock", "parameters": {"vessel_id": "v1"}}
+{"command": "tick", "parameters": {}}
+{"command": "load", "parameters": {"vessel_id": "v1", "destination": 2}}
+{"command": "tick", "parameters": {}}
+{"command": "swap", "parameters": {"vessel_id": "v2", "load_destination": 1, "unload_destination": 2}}
+{"command": "swap", "parameters": {"vessel_id": "v1", "load_destination": 0, "unload_destination": 2}}
+{"command": "swap", "parameters": {"vessel_id": "v1", "load_destination": 1, "unload_destination": 1}}
+{"command": "swap", "parameters": {"vessel_id": "v1", "load_destination": 1, "unload_destination": 2}}
+{"command": "tick", "parameters": {}}
+{"command": "swap", "parameters": {"vessel_id": "v1", "load_destination": 2, "unload_destination": 1}}
+{"command": "swap", "parameters": {"vessel_id": "v1", "load_destination": 1, "unload_destination": 2}}
+{"command": "swap", "parameters": {"vessel_id": "v1", "load_destination": 2, "unload_destination": 1}}
