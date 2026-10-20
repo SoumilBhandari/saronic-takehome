@@ -1,0 +1,17 @@
+{"status": "error", "payload": {"message": "travel_times must be a non-empty square matrix of integers"}}
+{"status": "error", "payload": {"message": "travel_times must be a non-empty square matrix of integers"}}
+{"status": "error", "payload": {"message": "travel_times must be 0 on the diagonal and positive elsewhere"}}
+{"status": "error", "payload": {"message": "travel_times must be 0 on the diagonal and positive elsewhere"}}
+{"status": "error", "payload": {"message": "dock_throughput must be a positive integer for each location"}}
+{"status": "error", "payload": {"message": "dock_throughput must be a positive integer for each location"}}
+{"status": "error", "payload": {"message": "each vessel needs a string id and a valid location"}}
+{"status": "error", "payload": {"message": "duplicate vessel id: v1"}}
+{"status": "error", "payload": {"message": "invalid cargo_manifest entry"}}
+{"status": "error", "payload": {"message": "invalid cargo_manifest entry"}}
+{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "idle", "location": 0, "cargo": []}}, "cargo": [{"location": 0, "destination": 1, "quantity": 1}]}}
+{"status": "error", "payload": {"message": "destination True is out of range"}}
+{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "docked", "location": 0, "cargo": []}}, "cargo": [{"location": 0, "destination": 1, "quantity": 1}]}}
+{"status": "ok", "payload": {"tick": 1, "vessels": {"v1": {"state": "docked", "location": 0, "cargo": []}}, "cargo": [{"location": 0, "destination": 1, "quantity": 1}]}}
+{"status": "error", "payload": {"message": "destination True is out of range"}}
+{"status": "error", "payload": {"message": "destination True is out of range"}}
+{"status": "error", "payload": {"message": "destination True is out of range"}}

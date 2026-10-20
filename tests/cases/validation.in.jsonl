@@ -1,0 +1,17 @@
+{"command": "init", "parameters": {"travel_times": [[0, 4], [4, 0], [1, 1]], "dock_throughput": [1, 1], "vessels": [{"id": "v1", "location": 0}]}}
+{"command": "init", "parameters": {"travel_times": [[0, true], [4, 0]], "dock_throughput": [1, 1], "vessels": [{"id": "v1", "location": 0}]}}
+{"command": "init", "parameters": {"travel_times": [[1, 4], [4, 0]], "dock_throughput": [1, 1], "vessels": [{"id": "v1", "location": 0}]}}
+{"command": "init", "parameters": {"travel_times": [[0, 0], [4, 0]], "dock_throughput": [1, 1], "vessels": [{"id": "v1", "location": 0}]}}
+{"command": "init", "parameters": {"travel_times": [[0, 4], [4, 0]], "dock_throughput": [1], "vessels": [{"id": "v1", "location": 0}]}}
+{"command": "init", "parameters": {"travel_times": [[0, 4], [4, 0]], "dock_throughput": [1, 0], "vessels": [{"id": "v1", "location": 0}]}}
+{"command": "init", "parameters": {"travel_times": [[0, 4], [4, 0]], "dock_throughput": [1, 1], "vessels": [{"id": "v1", "location": 2}]}}
+{"command": "init", "parameters": {"travel_times": [[0, 4], [4, 0]], "dock_throughput": [1, 1], "vessels": [{"id": "v1", "location": 0}, {"id": "v1", "location": 1}]}}
+{"command": "init", "parameters": {"travel_times": [[0, 4], [4, 0]], "dock_throughput": [1, 1], "vessels": [{"id": "v1", "location": 0}], "cargo_manifest": [{"location": 0, "destination": 1, "quantity": true}]}}
+{"command": "init", "parameters": {"travel_times": [[0, 4], [4, 0]], "dock_throughput": [1, 1], "vessels": [{"id": "v1", "location": 0}], "cargo_manifest": [{"location": 0.5, "destination": 1, "quantity": 1}]}}
+{"command": "init", "parameters": {"travel_times": [[0, 4], [4, 0]], "dock_throughput": [1, 1], "vessels": [{"id": "v1", "location": 0}], "cargo_manifest": [{"location": 0, "destination": 1, "quantity": 1}]}}
+{"command": "set_destination", "parameters": {"vessel_id": "v1", "destination": true}}
+{"command": "dock", "parameters": {"vessel_id": "v1"}}
+{"command": "tick", "parameters": {}}
+{"command": "load", "parameters": {"vessel_id": "v1", "destination": true}}
+{"command": "unload", "parameters": {"vessel_id": "v1", "destination": true}}
+{"command": "swap", "parameters": {"vessel_id": "v1", "load_destination": true, "unload_destination": 1}}

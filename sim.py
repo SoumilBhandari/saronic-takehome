@@ -15,6 +15,16 @@ class CommandError(Exception):
     """A rejected command. Its message is returned as the error response."""
 
 
+def is_int(value) -> bool:
+    """True for a JSON integer. Python treats booleans as ints, so exclude them."""
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def is_index(value, n: int) -> bool:
+    """True for a valid location index, 0 to n-1."""
+    return is_int(value) and 0 <= value < n
+
+
 def find_cargo(entries: list[dict], **key) -> dict | None:
     """Return the entry matching key (e.g. location and destination), or None."""
     for entry in entries:
@@ -80,6 +90,11 @@ class Simulation:
             raise CommandError(f"unknown vessel {vessel_id}")
         return self.committed["vessels"][vessel_id]
 
+    def _check_destination(self, destination) -> None:
+        """Reject a destination that is not a valid location index."""
+        if not is_index(destination, len(self.travel_times)):
+            raise CommandError(f"destination {destination} is out of range")
+
     def _use_operation(self, location: int) -> None:
         """Count one cargo operation at location, or reject it if the dock is at its limit."""
         used = self.ops.get(location, 0) + 1
@@ -95,9 +110,9 @@ class Simulation:
         n = len(self.travel_times)
         for entry in manifest:
             if not (
-                0 <= entry["location"] < n
-                and 0 <= entry["destination"] < n
-                and isinstance(entry["quantity"], int)
+                is_index(entry["location"], n)
+                and is_index(entry["destination"], n)
+                and is_int(entry["quantity"])
                 and entry["quantity"] > 0
             ):
                 raise CommandError("invalid cargo_manifest entry")
@@ -112,10 +127,45 @@ class Simulation:
                 destination=entry["destination"],
             )
 
+    def _check_setup(self, travel_times, dock_throughput, vessels) -> None:
+        """Reject an init whose map, docks or vessels are invalid."""
+        n = len(travel_times) if isinstance(travel_times, list) else 0
+        if n == 0 or not all(
+            isinstance(row, list) and len(row) == n and all(is_int(t) for t in row)
+            for row in travel_times
+        ):
+            raise CommandError("travel_times must be a non-empty square matrix of integers")
+        for i, row in enumerate(travel_times):
+            for j, t in enumerate(row):
+                if (i == j and t != 0) or (i != j and t <= 0):
+                    raise CommandError(
+                        "travel_times must be 0 on the diagonal and positive elsewhere"
+                    )
+        if not (
+            isinstance(dock_throughput, list)
+            and len(dock_throughput) == n
+            and all(is_int(t) and t > 0 for t in dock_throughput)
+        ):
+            raise CommandError("dock_throughput must be a positive integer for each location")
+        if not isinstance(vessels, list):
+            raise CommandError("vessels must be a list")
+        seen = set()
+        for vessel in vessels:
+            if not (
+                isinstance(vessel, dict)
+                and isinstance(vessel.get("id"), str)
+                and is_index(vessel.get("location"), n)
+            ):
+                raise CommandError("each vessel needs a string id and a valid location")
+            if vessel["id"] in seen:
+                raise CommandError(f"duplicate vessel id: {vessel['id']}")
+            seen.add(vessel["id"])
+
     def init(self, params: dict) -> dict:
         """Build the world at tick 0 from travel_times, dock_throughput, vessels and cargo."""
         if self.committed is not None:
             raise CommandError("simulation already initialized")
+        self._check_setup(params.get("travel_times"), params.get("dock_throughput"), params.get("vessels"))
         self.travel_times = params["travel_times"]
         self.dock_throughput = params["dock_throughput"]
         manifest = params.get("cargo_manifest", [])
@@ -140,8 +190,7 @@ class Simulation:
         vessel = self._vessel(vessel_id)
         if vessel["state"] != "idle":
             raise CommandError(f"vessel {vessel_id} is not idle")
-        if not 0 <= destination < len(self.travel_times):
-            raise CommandError(f"destination {destination} is out of range")
+        self._check_destination(destination)
         if destination == vessel["location"]:
             raise CommandError(f"vessel {vessel_id} is already at location {destination}")
         self.planned["vessels"][vessel_id] = {
@@ -182,6 +231,7 @@ class Simulation:
 
     def _check_load(self, location: int, destination: int) -> dict:
         """Return the planned dock entry a load would take from, or reject the load."""
+        self._check_destination(destination)
         entry = find_cargo(self.planned["cargo"], location=location, destination=destination)
         if entry is None:
             raise CommandError(f"no cargo for destination {destination} at location {location}")
@@ -195,6 +245,7 @@ class Simulation:
 
     def _check_unload(self, vessel_id: str, destination: int) -> dict:
         """Return the planned vessel entry an unload would take from, or reject the unload."""
+        self._check_destination(destination)
         entry = find_cargo(self.planned["vessels"][vessel_id]["cargo"], destination=destination)
         if entry is None:
             raise CommandError(f"vessel {vessel_id} has no cargo for destination {destination}")

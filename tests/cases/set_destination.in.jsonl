@@ -4,4 +4,5 @@
 {"command": "set_destination", "parameters": {"vessel_id": "v9", "destination": 1}}
 {"command": "set_destination", "parameters": {"vessel_id": "v2", "destination": 5}}
 {"command": "set_destination", "parameters": {"vessel_id": "v1", "destination": 0}}
+{"command": "set_destination", "parameters": {"destination": 1}}
 {"command": "get_state", "parameters": {}}
