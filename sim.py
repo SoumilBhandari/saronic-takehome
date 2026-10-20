@@ -25,6 +25,17 @@ def is_index(value, n: int) -> bool:
     return is_int(value) and 0 <= value < n
 
 
+def without_cargo(state: dict) -> dict:
+    """The base problem's view of a world state: no vessel or dock cargo."""
+    return {
+        "tick": state["tick"],
+        "vessels": {
+            vessel_id: {k: v for k, v in vessel.items() if k != "cargo"}
+            for vessel_id, vessel in state["vessels"].items()
+        },
+    }
+
+
 def find_cargo(entries: list[dict], **key) -> dict | None:
     """Return the entry matching key (e.g. location and destination), or None."""
     for entry in entries:
@@ -52,6 +63,7 @@ def take_cargo(entries: list[dict], entry: dict) -> None:
 class Simulation:
     def __init__(self) -> None:
         self.travel_times: list[list[int]] = []  # travel_times[i][j] = ticks from i to j
+        self.has_cargo = False  # Follow-on 1 is on when init includes dock_throughput
         self.dock_throughput: list[int] = []  # max cargo operations per dock per tick
         self.ops: dict[int, int] = {}  # cargo operations used per location since the last tick
         self.history: list[dict] = []  # committed state at every tick; history[t] is tick t
@@ -72,7 +84,10 @@ class Simulation:
             name, params = self._parse(line)
             if self.committed is None and name != "init":
                 raise CommandError("simulation not initialized")
-            return {"status": "ok", "payload": self.COMMANDS[name](self, params)}
+            if name in self.CARGO_COMMANDS and not self.has_cargo:
+                raise CommandError(f"{name} requires dock_throughput in init")
+            payload = self.COMMANDS[name](self, params)
+            return {"status": "ok", "payload": payload if self.has_cargo else without_cargo(payload)}
         except CommandError as e:
             return {"status": "error", "payload": {"message": str(e)}}
         except Exception as e:  # a bug or malformed input; keep running
@@ -116,6 +131,8 @@ class Simulation:
 
     def _check_manifest(self, manifest: list[dict]) -> None:
         """Reject the command if any cargo_manifest entry is out of range."""
+        if manifest and not self.has_cargo:
+            raise CommandError("cargo_manifest requires dock_throughput in init")
         n = len(self.travel_times)
         for entry in manifest:
             if not (
@@ -150,7 +167,7 @@ class Simulation:
                     raise CommandError(
                         "travel_times must be 0 on the diagonal and positive elsewhere"
                     )
-        if not (
+        if dock_throughput is not None and not (  # absent means the base problem
             isinstance(dock_throughput, list)
             and len(dock_throughput) == n
             and all(is_int(t) and t > 0 for t in dock_throughput)
@@ -176,7 +193,8 @@ class Simulation:
             raise CommandError("simulation already initialized")
         self._check_setup(params.get("travel_times"), params.get("dock_throughput"), params.get("vessels"))
         self.travel_times = params["travel_times"]
-        self.dock_throughput = params["dock_throughput"]
+        self.has_cargo = params.get("dock_throughput") is not None
+        self.dock_throughput = params.get("dock_throughput") or []
         manifest = params.get("cargo_manifest", [])
         self._check_manifest(manifest)
         vessels = {
@@ -333,6 +351,9 @@ class Simulation:
         self._add_manifest(manifest)
         self.planned = copy.deepcopy(self.committed)
         return self.planned
+
+    # Follow-on 1 commands, rejected when init had no dock_throughput.
+    CARGO_COMMANDS = {"dock", "undock", "load", "unload", "swap"}
 
     # Command name -> handler. Adding a command means adding one line here.
     COMMANDS = {

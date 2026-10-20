@@ -1,0 +1,7 @@
+{"status": "error", "payload": {"message": "cargo_manifest requires dock_throughput in init"}}
+{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "idle", "location": 0}}}}
+{"status": "error", "payload": {"message": "dock requires dock_throughput in init"}}
+{"status": "error", "payload": {"message": "load requires dock_throughput in init"}}
+{"status": "error", "payload": {"message": "cargo_manifest requires dock_throughput in init"}}
+{"status": "ok", "payload": {"tick": 1, "vessels": {"v1": {"state": "idle", "location": 0}}}}
+{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "idle", "location": 0}}}}

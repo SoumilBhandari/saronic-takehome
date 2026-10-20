@@ -1,0 +1,7 @@
+{"command": "init", "parameters": {"travel_times": [[0, 4], [4, 0]], "vessels": [{"id": "v1", "location": 0}], "cargo_manifest": [{"location": 0, "destination": 1, "quantity": 1}]}}
+{"command": "init", "parameters": {"travel_times": [[0, 4], [4, 0]], "vessels": [{"id": "v1", "location": 0}]}}
+{"command": "dock", "parameters": {"vessel_id": "v1"}}
+{"command": "load", "parameters": {"vessel_id": "v1", "destination": 1}}
+{"command": "tick", "parameters": {"cargo_manifest": [{"location": 0, "destination": 1, "quantity": 1}]}}
+{"command": "tick", "parameters": {}}
+{"command": "get_state_at", "parameters": {"tick": 0}}
