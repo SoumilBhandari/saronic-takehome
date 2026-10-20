@@ -54,8 +54,17 @@ class Simulation:
         self.travel_times: list[list[int]] = []  # travel_times[i][j] = ticks from i to j
         self.dock_throughput: list[int] = []  # max cargo operations per dock per tick
         self.ops: dict[int, int] = {}  # cargo operations used per location since the last tick
-        self.committed: dict | None = None  # world state at the current tick
+        self.history: list[dict] = []  # committed state at every tick; history[t] is tick t
         self.planned: dict | None = None  # committed state plus commands since the last tick
+
+    @property
+    def committed(self) -> dict | None:
+        """World state at the current tick: the latest entry in history.
+
+        Commands only write to planned, and tick appends planned as a new entry, so an
+        entry is never modified once its tick is over. That is why history needs no copies.
+        """
+        return self.history[-1] if self.history else None
 
     def handle(self, line: str) -> dict:
         """Process one input line and return exactly one response envelope."""
@@ -174,7 +183,7 @@ class Simulation:
             v["id"]: {"state": "idle", "location": v["location"], "cargo": []}
             for v in params["vessels"]
         }
-        self.committed = {"tick": 0, "vessels": vessels, "cargo": []}
+        self.history = [{"tick": 0, "vessels": vessels, "cargo": []}]
         self._add_manifest(manifest)
         self.planned = copy.deepcopy(self.committed)
         return self.planned
@@ -182,6 +191,18 @@ class Simulation:
     def get_state(self, params: dict) -> dict:
         """Return the planned state."""
         return self.planned
+
+    def get_state_at(self, params: dict) -> dict:
+        """Return the committed state at a past or current tick."""
+        tick = params["tick"]
+        current = self.committed["tick"]
+        if not is_int(tick):
+            raise CommandError("tick must be an integer")
+        if tick < 0:  # checked explicitly: history[-1] would silently return the latest state
+            raise CommandError(f"tick {tick} is before the start of the simulation")
+        if tick > current:
+            raise CommandError(f"tick {tick} is in the future (current tick: {current})")
+        return self.history[tick]
 
     def set_destination(self, params: dict) -> dict:
         """Send an idle vessel toward a location, replacing any earlier order this tick."""
@@ -299,7 +320,7 @@ class Simulation:
         """Commit the planned state, advance one tick, resolve arrivals, and add new cargo."""
         manifest = params.get("cargo_manifest", [])
         self._check_manifest(manifest)  # before committing, so a rejected tick changes nothing
-        self.committed = self.planned
+        self.history.append(self.planned)  # the plan becomes the committed state
         self.committed["tick"] += 1
         self.ops = {}
         for vessel_id, vessel in self.committed["vessels"].items():
@@ -317,6 +338,7 @@ class Simulation:
     COMMANDS = {
         "init": init,
         "get_state": get_state,
+        "get_state_at": get_state_at,
         "set_destination": set_destination,
         "dock": dock,
         "undock": undock,

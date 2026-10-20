@@ -1,0 +1,16 @@
+{"command": "init", "parameters": {"travel_times": [[0, 4], [4, 0]], "dock_throughput": [1, 1], "vessels": [{"id": "v1", "location": 0}]}}
+{"command": "get_state_at", "parameters": {"tick": 0}}
+{"command": "set_destination", "parameters": {"vessel_id": "v1", "destination": 1}}
+{"command": "get_state_at", "parameters": {"tick": 0}}
+{"command": "get_state_at", "parameters": {"tick": -1}}
+{"command": "get_state_at", "parameters": {"tick": true}}
+{"command": "get_state_at", "parameters": {"tick": "1"}}
+{"command": "tick", "parameters": {}}
+{"command": "tick", "parameters": {}}
+{"command": "tick", "parameters": {}}
+{"command": "tick", "parameters": {}}
+{"command": "get_state_at", "parameters": {"tick": 0}}
+{"command": "get_state_at", "parameters": {"tick": 2}}
+{"command": "get_state_at", "parameters": {"tick": 4}}
+{"command": "tick", "parameters": {"cargo_manifest": [{"location": 0, "destination": 1, "quantity": 0}]}}
+{"command": "get_state_at", "parameters": {"tick": 5}}
