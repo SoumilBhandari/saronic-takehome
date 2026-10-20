@@ -1,0 +1,15 @@
+{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "idle", "location": 0, "cargo": []}}, "cargo": [{"location": 0, "destination": 2, "quantity": 3}]}}
+{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "docked", "location": 0, "cargo": []}}, "cargo": [{"location": 0, "destination": 2, "quantity": 3}]}}
+{"status": "ok", "payload": {"tick": 0, "vessels": {"v1": {"state": "docked", "location": 0, "cargo": []}}, "cargo": [{"location": 0, "destination": 2, "quantity": 3}]}}
+{"status": "error", "payload": {"message": "vessel v1 is not docked"}}
+{"status": "ok", "payload": {"tick": 1, "vessels": {"v1": {"state": "docked", "location": 0, "cargo": []}}, "cargo": [{"location": 0, "destination": 2, "quantity": 3}]}}
+{"status": "ok", "payload": {"tick": 1, "vessels": {"v1": {"state": "docked", "location": 0, "cargo": [{"destination": 2, "quantity": 1}]}}, "cargo": [{"location": 0, "destination": 2, "quantity": 2}]}}
+{"status": "ok", "payload": {"tick": 1, "vessels": {"v1": {"state": "docked", "location": 0, "cargo": []}}, "cargo": [{"location": 0, "destination": 2, "quantity": 3}]}}
+{"status": "error", "payload": {"message": "transfer of 3 operations exceeds dock throughput of 2 at location 0"}}
+{"status": "ok", "payload": {"tick": 2, "vessels": {"v1": {"state": "docked", "location": 0, "cargo": []}}, "cargo": [{"location": 0, "destination": 2, "quantity": 3}]}}
+{"status": "ok", "payload": {"tick": 2, "vessels": {"v1": {"state": "docked", "location": 0, "cargo": [{"destination": 2, "quantity": 1}]}}, "cargo": [{"location": 0, "destination": 2, "quantity": 2}]}}
+{"status": "ok", "payload": {"tick": 2, "vessels": {"v1": {"state": "idle", "location": 0, "cargo": [{"destination": 2, "quantity": 1}]}}, "cargo": [{"location": 0, "destination": 2, "quantity": 2}]}}
+{"status": "ok", "payload": {"tick": 2, "vessels": {"v1": {"state": "idle", "location": 0, "cargo": [{"destination": 2, "quantity": 2}]}}, "cargo": [{"location": 0, "destination": 2, "quantity": 1}]}}
+{"status": "ok", "payload": {"tick": 2, "vessels": {"v1": {"state": "idle", "location": 0, "cargo": [{"destination": 2, "quantity": 2}]}}, "cargo": [{"location": 0, "destination": 2, "quantity": 1}]}}
+{"status": "error", "payload": {"message": "vessel v1 is not idle"}}
+{"status": "ok", "payload": {"tick": 3, "vessels": {"v1": {"state": "idle", "location": 0, "cargo": [{"destination": 2, "quantity": 2}]}}, "cargo": [{"location": 0, "destination": 2, "quantity": 1}]}}
