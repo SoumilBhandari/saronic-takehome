@@ -58,6 +58,12 @@ class Simulation:
             raise CommandError(f"unknown command: {name}")
         return name, message["parameters"]
 
+    def _vessel(self, vessel_id: str) -> dict:
+        """Return the vessel's committed state, or reject an unknown vessel_id."""
+        if vessel_id not in self.committed["vessels"]:
+            raise CommandError(f"unknown vessel {vessel_id}")
+        return self.committed["vessels"][vessel_id]
+
     def _check_manifest(self, manifest: list[dict]) -> None:
         """Reject the command if any cargo_manifest entry is out of range."""
         n = len(self.travel_times)
@@ -105,9 +111,7 @@ class Simulation:
         """Send an idle vessel toward a location, replacing any earlier order this tick."""
         vessel_id = params["vessel_id"]
         destination = params["destination"]
-        if vessel_id not in self.committed["vessels"]:
-            raise CommandError(f"unknown vessel {vessel_id}")
-        vessel = self.committed["vessels"][vessel_id]
+        vessel = self._vessel(vessel_id)
         if vessel["state"] != "idle":
             raise CommandError(f"vessel {vessel_id} is not idle")
         if not 0 <= destination < len(self.travel_times):
@@ -120,6 +124,32 @@ class Simulation:
             "to": destination,
             "arrives_at_tick": self.committed["tick"]
             + self.travel_times[vessel["location"]][destination],
+            "cargo": self.planned["vessels"][vessel_id]["cargo"],
+        }
+        return self.planned
+
+    def dock(self, params: dict) -> dict:
+        """Park an idle vessel at its current location, replacing any earlier order this tick."""
+        vessel_id = params["vessel_id"]
+        vessel = self._vessel(vessel_id)
+        if vessel["state"] != "idle":
+            raise CommandError(f"vessel {vessel_id} is not idle")
+        self.planned["vessels"][vessel_id] = {
+            "state": "docked",
+            "location": vessel["location"],
+            "cargo": self.planned["vessels"][vessel_id]["cargo"],
+        }
+        return self.planned
+
+    def undock(self, params: dict) -> dict:
+        """Return a docked vessel to idle at its current location."""
+        vessel_id = params["vessel_id"]
+        vessel = self._vessel(vessel_id)
+        if vessel["state"] != "docked":
+            raise CommandError(f"vessel {vessel_id} is not docked")
+        self.planned["vessels"][vessel_id] = {
+            "state": "idle",
+            "location": vessel["location"],
             "cargo": self.planned["vessels"][vessel_id]["cargo"],
         }
         return self.planned
@@ -146,6 +176,8 @@ class Simulation:
         "init": init,
         "get_state": get_state,
         "set_destination": set_destination,
+        "dock": dock,
+        "undock": undock,
         "tick": tick,
     }
 
