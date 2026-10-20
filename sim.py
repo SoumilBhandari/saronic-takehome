@@ -15,19 +15,35 @@ class CommandError(Exception):
     """A rejected command. Its message is returned as the error response."""
 
 
-def add_cargo(entries: list[dict], quantity: int, **key) -> None:
-    """Add units to the entry matching key (e.g. location and destination), creating it if needed."""
+def find_cargo(entries: list[dict], **key) -> dict | None:
+    """Return the entry matching key (e.g. location and destination), or None."""
     for entry in entries:
         if all(entry[k] == v for k, v in key.items()):
-            entry["quantity"] += quantity
-            return
-    entries.append({**key, "quantity": quantity})
+            return entry
+    return None
+
+
+def add_cargo(entries: list[dict], quantity: int, **key) -> None:
+    """Add units to the entry matching key, creating it at the end if needed."""
+    entry = find_cargo(entries, **key)
+    if entry is None:
+        entries.append({**key, "quantity": quantity})
+    else:
+        entry["quantity"] += quantity
+
+
+def take_cargo(entries: list[dict], entry: dict) -> None:
+    """Remove one unit from entry, dropping it from the list when none are left."""
+    entry["quantity"] -= 1
+    if entry["quantity"] == 0:
+        entries.remove(entry)
 
 
 class Simulation:
     def __init__(self) -> None:
         self.travel_times: list[list[int]] = []  # travel_times[i][j] = ticks from i to j
         self.dock_throughput: list[int] = []  # max cargo operations per dock per tick
+        self.ops: dict[int, int] = {}  # cargo operations used per location since the last tick
         self.committed: dict | None = None  # world state at the current tick
         self.planned: dict | None = None  # committed state plus commands since the last tick
 
@@ -63,6 +79,16 @@ class Simulation:
         if vessel_id not in self.committed["vessels"]:
             raise CommandError(f"unknown vessel {vessel_id}")
         return self.committed["vessels"][vessel_id]
+
+    def _use_operation(self, location: int) -> None:
+        """Count one cargo operation at location, or reject it if the dock is at its limit."""
+        used = self.ops.get(location, 0) + 1
+        limit = self.dock_throughput[location]
+        if used > limit:
+            raise CommandError(
+                f"transfer of {used} operations exceeds dock throughput of {limit} at location {location}"
+            )
+        self.ops[location] = used
 
     def _check_manifest(self, manifest: list[dict]) -> None:
         """Reject the command if any cargo_manifest entry is out of range."""
@@ -154,12 +180,48 @@ class Simulation:
         }
         return self.planned
 
+    def load(self, params: dict) -> dict:
+        """Move one unit of cargo from the dock onto a docked vessel."""
+        vessel_id = params["vessel_id"]
+        destination = params["destination"]
+        vessel = self._vessel(vessel_id)
+        if vessel["state"] != "docked":
+            raise CommandError(f"vessel {vessel_id} is not docked")
+        location = vessel["location"]
+        dock_cargo = self.planned["cargo"]
+        entry = find_cargo(dock_cargo, location=location, destination=destination)
+        if entry is None:
+            raise CommandError(f"no cargo for destination {destination} at location {location}")
+        self._use_operation(location)
+        take_cargo(dock_cargo, entry)
+        add_cargo(self.planned["vessels"][vessel_id]["cargo"], 1, destination=destination)
+        return self.planned
+
+    def unload(self, params: dict) -> dict:
+        """Move one unit of cargo from a docked vessel to the dock, delivering it if it has arrived."""
+        vessel_id = params["vessel_id"]
+        destination = params["destination"]
+        vessel = self._vessel(vessel_id)
+        if vessel["state"] != "docked":
+            raise CommandError(f"vessel {vessel_id} is not docked")
+        location = vessel["location"]
+        vessel_cargo = self.planned["vessels"][vessel_id]["cargo"]
+        entry = find_cargo(vessel_cargo, destination=destination)
+        if entry is None:
+            raise CommandError(f"vessel {vessel_id} has no cargo for destination {destination}")
+        self._use_operation(location)
+        take_cargo(vessel_cargo, entry)
+        if destination != location:  # cargo unloaded at its destination is delivered
+            add_cargo(self.planned["cargo"], 1, location=location, destination=destination)
+        return self.planned
+
     def tick(self, params: dict) -> dict:
         """Commit the planned state, advance one tick, resolve arrivals, and add new cargo."""
         manifest = params.get("cargo_manifest", [])
         self._check_manifest(manifest)  # before committing, so a rejected tick changes nothing
         self.committed = self.planned
         self.committed["tick"] += 1
+        self.ops = {}
         for vessel_id, vessel in self.committed["vessels"].items():
             if vessel["state"] == "transit" and vessel["arrives_at_tick"] == self.committed["tick"]:
                 self.committed["vessels"][vessel_id] = {
@@ -178,6 +240,8 @@ class Simulation:
         "set_destination": set_destination,
         "dock": dock,
         "undock": undock,
+        "load": load,
+        "unload": unload,
         "tick": tick,
     }
 
