@@ -1,10 +1,8 @@
-"""Fleet simulation engine.
-
-Reads newline-delimited JSON commands from stdin and writes exactly one JSON
-response per command to stdout.
-
-Usage: python3 sim.py < commands.jsonl
-"""
+# =============================================================================
+#  Program Description:  Fleet simulation engine. Reads one JSON command per
+#                        line from stdin and writes one JSON response per line
+#                        to stdout, reporting every vessel and dock.
+# =============================================================================
 
 import copy
 import json
@@ -12,11 +10,15 @@ import sys
 
 
 class CommandError(Exception):
-    """A rejected command. Its message is returned as the error response."""
+    """A rejected command; its message becomes the error response."""
 
+
+# =============================================================================
+#  Input checks
+# =============================================================================
 
 def is_int(value) -> bool:
-    """True for a JSON integer. Python treats booleans as ints, so exclude them."""
+    """True for an int that isn't a bool."""
     return isinstance(value, int) and not isinstance(value, bool)
 
 
@@ -25,8 +27,36 @@ def is_index(value, n: int) -> bool:
     return is_int(value) and 0 <= value < n
 
 
+# =============================================================================
+#  Cargo lists
+# =============================================================================
+
+def find_cargo(entries: list[dict], **key) -> dict | None:
+    """Return the entry matching every field in key, or None."""
+    for entry in entries:
+        if all(entry[k] == v for k, v in key.items()):
+            return entry
+    return None
+
+
+def add_cargo(entries: list[dict], quantity: int, **key) -> None:
+    """Add units to the matching entry, or append a new one."""
+    entry = find_cargo(entries, **key)
+    if entry is None:
+        entries.append({**key, "quantity": quantity})
+    else:
+        entry["quantity"] += quantity
+
+
+def take_cargo(entries: list[dict], entry: dict) -> None:
+    """Remove one unit from entry, dropping it at zero."""
+    entry["quantity"] -= 1
+    if entry["quantity"] == 0:
+        entries.remove(entry)
+
+
 def without_cargo(state: dict) -> dict:
-    """The base problem's view of a world state: no vessel or dock cargo."""
+    """Return the state with all cargo fields removed (base problem output)."""
     return {
         "tick": state["tick"],
         "vessels": {
@@ -36,61 +66,37 @@ def without_cargo(state: dict) -> dict:
     }
 
 
-def find_cargo(entries: list[dict], **key) -> dict | None:
-    """Return the entry matching key (e.g. location and destination), or None."""
-    for entry in entries:
-        if all(entry[k] == v for k, v in key.items()):
-            return entry
-    return None
-
-
-def add_cargo(entries: list[dict], quantity: int, **key) -> None:
-    """Add units to the entry matching key, creating it at the end if needed."""
-    entry = find_cargo(entries, **key)
-    if entry is None:
-        entries.append({**key, "quantity": quantity})
-    else:
-        entry["quantity"] += quantity
-
-
-def take_cargo(entries: list[dict], entry: dict) -> None:
-    """Remove one unit from entry, dropping it from the list when none are left."""
-    entry["quantity"] -= 1
-    if entry["quantity"] == 0:
-        entries.remove(entry)
-
+# =============================================================================
+#  Simulation
+# =============================================================================
 
 class Simulation:
-    # Commands the protocol accepts; each name is a method below.
     COMMANDS = {
         "init", "tick", "set_destination", "get_state",
         "dock", "undock", "load", "unload", "swap",
         "get_state_at",
     }
-    # Follow-on 1 commands, rejected when init had no dock_throughput.
-    CARGO_COMMANDS = {"dock", "undock", "load", "unload", "swap"}
+    CARGO_COMMANDS = {"dock", "undock", "load", "unload", "swap"}  # need dock_throughput
 
     def __init__(self) -> None:
         self.travel_times: list[list[int]] = []  # travel_times[i][j] = ticks from i to j
-        self.has_cargo = False  # Follow-on 1 is on when init includes dock_throughput
+        self.has_cargo = False  # True when init included dock_throughput
         self.dock_throughput: list[int] = []  # max cargo operations per dock per tick
-        self.ops: dict[int, int] = {}  # cargo operations used per location since the last tick
-        self.history: list[dict] = []  # committed state at every tick; history[t] is tick t
-        self.planned: dict | None = None  # committed state plus commands since the last tick
+        self.ops: dict[int, int] = {}  # cargo operations used per dock this tick
+        self.history: list[dict] = []  # history[t] = committed state at tick t
+        self.planned: dict | None = None  # committed state + this tick's commands
 
     @property
     def committed(self) -> dict | None:
-        """World state at the current tick: the latest entry in history.
-
-        Commands only write to planned, and tick appends planned as a new entry, so an
-        entry is never modified once its tick is over. That is why history needs no copies.
-        """
+        """The current committed state: the latest history entry, or None before init."""
         return self.history[-1] if self.history else None
 
-    # --- Protocol -------------------------------------------------------------
+    # =========================================================================
+    #  Protocol
+    # =========================================================================
 
     def handle(self, line: str) -> dict:
-        """Process one input line and return exactly one response envelope."""
+        """Process one input line and return exactly one ok or error response."""
         try:
             name, params = self._parse(line)
             if self.committed is None and name != "init":
@@ -105,7 +111,7 @@ class Simulation:
             return {"status": "error", "payload": {"message": f"internal error: {e!r}"}}
 
     def _parse(self, line: str) -> tuple[str, dict]:
-        """Split a raw line into a known command name and its parameters."""
+        """Return the command name and parameters, or reject a malformed line."""
         try:
             message = json.loads(line)
         except json.JSONDecodeError:
@@ -119,13 +125,12 @@ class Simulation:
             raise CommandError(f"unknown command: {name}")
         return name, message["parameters"]
 
-    # --- Helpers --------------------------------------------------------------
+    # =========================================================================
+    #  Vessel helpers
+    # =========================================================================
 
     def _vessel(self, vessel_id: str, state: str) -> dict:
-        """Return the vessel's committed state, or reject it if unknown or not in `state`.
-
-        This is the core rule: a vessel's mode is always checked against the committed state.
-        """
+        """Return the vessel's committed record; reject it if unknown or not in `state`."""
         if vessel_id not in self.committed["vessels"]:
             raise CommandError(f"unknown vessel {vessel_id}")
         vessel = self.committed["vessels"][vessel_id]
@@ -134,27 +139,21 @@ class Simulation:
         return vessel
 
     def _plan(self, vessel_id: str, fields: dict) -> None:
-        """Set a vessel's planned mode, keeping its planned cargo."""
+        """Set a vessel's planned mode, keeping its cargo."""
         cargo = self.planned["vessels"][vessel_id]["cargo"]
         self.planned["vessels"][vessel_id] = {**fields, "cargo": cargo}
 
     def _check_destination(self, destination) -> None:
-        """Reject a destination that is not a valid location index."""
+        """Reject a destination that isn't a valid location."""
         if not is_index(destination, len(self.travel_times)):
             raise CommandError(f"destination {destination} is out of range")
 
-    def _use_operation(self, location: int) -> None:
-        """Count one cargo operation at location, or reject it if the dock is at its limit."""
-        used = self.ops.get(location, 0) + 1
-        limit = self.dock_throughput[location]
-        if used > limit:
-            raise CommandError(
-                f"transfer of {used} operations exceeds dock throughput of {limit} at location {location}"
-            )
-        self.ops[location] = used
+    # =========================================================================
+    #  Setup checks
+    # =========================================================================
 
     def _check_setup(self, travel_times, dock_throughput, vessels) -> None:
-        """Reject an init whose map, docks or vessels are invalid."""
+        """Reject an invalid map, dock list or vessel list in init."""
         n = len(travel_times) if isinstance(travel_times, list) else 0
         if n == 0 or not all(
             isinstance(row, list) and len(row) == n and all(is_int(t) for t in row)
@@ -188,7 +187,7 @@ class Simulation:
             seen.add(vessel["id"])
 
     def _check_manifest(self, manifest: list[dict]) -> None:
-        """Reject the command if any cargo_manifest entry is out of range."""
+        """Reject the command if any cargo_manifest entry is invalid."""
         if manifest and not self.has_cargo:
             raise CommandError("cargo_manifest requires dock_throughput in init")
         n = len(self.travel_times)
@@ -202,7 +201,7 @@ class Simulation:
                 raise CommandError("invalid cargo_manifest entry")
 
     def _add_manifest(self, manifest: list[dict]) -> None:
-        """Add cargo_manifest units to dock inventory in the committed state."""
+        """Add manifest cargo to the committed docks."""
         for entry in manifest:
             add_cargo(
                 self.committed["cargo"],
@@ -211,8 +210,22 @@ class Simulation:
                 destination=entry["destination"],
             )
 
+    # =========================================================================
+    #  Cargo moves
+    # =========================================================================
+
+    def _use_operation(self, location: int) -> None:
+        """Count one operation at the dock; reject if it's at its limit this tick."""
+        used = self.ops.get(location, 0) + 1
+        limit = self.dock_throughput[location]
+        if used > limit:
+            raise CommandError(
+                f"transfer of {used} operations exceeds dock throughput of {limit} at location {location}"
+            )
+        self.ops[location] = used
+
     def _check_load(self, location: int, destination: int) -> dict:
-        """Return the planned dock entry a load would take from, or reject the load."""
+        """Return the planned dock entry to load from, or reject the load."""
         self._check_destination(destination)
         entry = find_cargo(self.planned["cargo"], location=location, destination=destination)
         if entry is None:
@@ -220,13 +233,13 @@ class Simulation:
         return entry
 
     def _move_load(self, vessel_id: str, entry: dict) -> None:
-        """Move one unit of a checked dock entry onto the vessel."""
+        """Move one unit from the dock entry onto the vessel."""
         destination = entry["destination"]
         take_cargo(self.planned["cargo"], entry)
         add_cargo(self.planned["vessels"][vessel_id]["cargo"], 1, destination=destination)
 
     def _check_unload(self, vessel_id: str, destination: int) -> dict:
-        """Return the planned vessel entry an unload would take from, or reject the unload."""
+        """Return the planned vessel entry to unload from, or reject the unload."""
         self._check_destination(destination)
         entry = find_cargo(self.planned["vessels"][vessel_id]["cargo"], destination=destination)
         if entry is None:
@@ -234,16 +247,18 @@ class Simulation:
         return entry
 
     def _move_unload(self, vessel_id: str, location: int, entry: dict) -> None:
-        """Move one unit of a checked vessel entry to the dock, delivering it if it has arrived."""
+        """Move one unit to the dock, or deliver it if this is its destination."""
         destination = entry["destination"]
         take_cargo(self.planned["vessels"][vessel_id]["cargo"], entry)
-        if destination != location:  # cargo unloaded at its destination is delivered
+        if destination != location:
             add_cargo(self.planned["cargo"], 1, location=location, destination=destination)
 
-    # --- Base commands --------------------------------------------------------
+    # =========================================================================
+    #  Base commands
+    # =========================================================================
 
     def init(self, params: dict) -> dict:
-        """Build the world at tick 0 from travel_times, dock_throughput, vessels and cargo."""
+        """Build the world at tick 0; without dock_throughput, run the base problem."""
         if self.committed is not None:
             raise CommandError("simulation already initialized")
         self._check_setup(params.get("travel_times"), params.get("dock_throughput"), params.get("vessels"))
@@ -262,7 +277,7 @@ class Simulation:
         return self.planned
 
     def tick(self, params: dict) -> dict:
-        """Commit the planned state, advance one tick, resolve arrivals, and add new cargo."""
+        """Commit the plan, advance one tick, resolve arrivals and add new cargo."""
         manifest = params.get("cargo_manifest", [])
         self._check_manifest(manifest)  # before committing, so a rejected tick changes nothing
         self.history.append(self.planned)  # the plan becomes the committed state
@@ -280,7 +295,7 @@ class Simulation:
         return self.planned
 
     def set_destination(self, params: dict) -> dict:
-        """Send an idle vessel toward a location, replacing any earlier order this tick."""
+        """Send an idle vessel to another location, replacing any earlier order."""
         vessel_id = params["vessel_id"]
         destination = params["destination"]
         vessel = self._vessel(vessel_id, "idle")
@@ -297,27 +312,28 @@ class Simulation:
         return self.planned
 
     def get_state(self, params: dict) -> dict:
-        """Return the planned state."""
         return self.planned
 
-    # --- Follow-on 1: docks and cargo -----------------------------------------
+    # =========================================================================
+    #  Follow-on 1: docks and cargo
+    # =========================================================================
 
     def dock(self, params: dict) -> dict:
-        """Park an idle vessel at its current location, replacing any earlier order this tick."""
+        """Dock an idle vessel at its current location."""
         vessel_id = params["vessel_id"]
         vessel = self._vessel(vessel_id, "idle")
         self._plan(vessel_id, {"state": "docked", "location": vessel["location"]})
         return self.planned
 
     def undock(self, params: dict) -> dict:
-        """Return a docked vessel to idle at its current location."""
+        """Return a docked vessel to idle."""
         vessel_id = params["vessel_id"]
         vessel = self._vessel(vessel_id, "docked")
         self._plan(vessel_id, {"state": "idle", "location": vessel["location"]})
         return self.planned
 
     def load(self, params: dict) -> dict:
-        """Move one unit of cargo from the dock onto a docked vessel."""
+        """Move one unit from the dock onto a docked vessel."""
         vessel_id = params["vessel_id"]
         vessel = self._vessel(vessel_id, "docked")
         entry = self._check_load(vessel["location"], params["destination"])
@@ -326,7 +342,7 @@ class Simulation:
         return self.planned
 
     def unload(self, params: dict) -> dict:
-        """Move one unit of cargo from a docked vessel to the dock, delivering it if it has arrived."""
+        """Move one unit from a docked vessel to the dock."""
         vessel_id = params["vessel_id"]
         vessel = self._vessel(vessel_id, "docked")
         entry = self._check_unload(vessel_id, params["destination"])
@@ -335,10 +351,9 @@ class Simulation:
         return self.planned
 
     def swap(self, params: dict) -> dict:
-        """Load one unit and unload another as a single cargo operation."""
+        """Load one unit and unload another as one operation, checking both first."""
         vessel_id = params["vessel_id"]
         location = self._vessel(vessel_id, "docked")["location"]
-        # Both halves are checked before either moves: the swap is simultaneous.
         load_entry = self._check_load(location, params["load_destination"])
         unload_entry = self._check_unload(vessel_id, params["unload_destination"])
         self._use_operation(location)
@@ -346,7 +361,9 @@ class Simulation:
         self._move_unload(vessel_id, location, unload_entry)
         return self.planned
 
-    # --- Follow-on 2: history -------------------------------------------------
+    # =========================================================================
+    #  Follow-on 2: history
+    # =========================================================================
 
     def get_state_at(self, params: dict) -> dict:
         """Return the committed state at a past or current tick."""
@@ -354,14 +371,19 @@ class Simulation:
         current = self.committed["tick"]
         if not is_int(tick):
             raise CommandError("tick must be an integer")
-        if tick < 0:  # checked explicitly: history[-1] would silently return the latest state
+        if tick < 0:  # explicit: history[-1] would return the latest state
             raise CommandError(f"tick {tick} is before the start of the simulation")
         if tick > current:
             raise CommandError(f"tick {tick} is in the future (current tick: {current})")
         return self.history[tick]
 
 
+# =============================================================================
+#  Entry point
+# =============================================================================
+
 def main() -> None:
+    """Answer each non-blank stdin line with one JSON line."""
     sim = Simulation()
     for line in sys.stdin:
         if line.strip():  # blank lines are not commands
