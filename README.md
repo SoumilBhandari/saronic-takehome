@@ -1,12 +1,21 @@
 # Fleet Simulation Engine
 
-A discrete-time simulation engine for a fleet of vessels (Saronic interview project, Project 2). It reads one JSON command per line on stdin and writes exactly one JSON response per line on stdout.
+A discrete-time simulation engine for a fleet of vessels, built for the Saronic interview project (Project 2). It reads one JSON command per line on stdin and writes exactly one JSON response per line on stdout.
 
-It implements the base problem, Follow-on 1 (cargo and docks) and Follow-on 2 (historical queries). The design and the reasoning behind it are in [`Fleet_Simulation_Design_Doc.pdf`](Fleet_Simulation_Design_Doc.pdf).
+It implements the base problem, Follow-on 1 (cargo and docks) and Follow-on 2 (historical queries). The design and the reasoning behind it are in the [design doc](Fleet_Simulation_Design_Doc.pdf).
+
+## Quick start
+
+```bash
+git clone https://github.com/SoumilBhandari/saronic-takehome.git
+cd saronic-takehome
+python3 -m unittest                                  # run the test suite
+python3 sim.py < tests/cases/base_example.in.jsonl   # replay the spec's base example
+```
 
 ## Requirements
 
-- Python 3.10 or newer (tested on 3.10, 3.11 and 3.14). Check with `python3 --version`.
+- Python 3.10 or newer (tested on 3.10, 3.11, 3.13 and 3.14). Check with `python3 --version`; the `python3` that ships with macOS is 3.9, so use a newer one if that's what you get.
 - Nothing to install: the engine uses only the Python standard library.
 
 ## Project layout
@@ -22,7 +31,7 @@ Fleet_Simulation_Design_Doc.pdf   design doc
 
 ## Running the engine
 
-Run every command below from the project root, the folder that contains `sim.py`.
+Run every command below from the project root (the `saronic-takehome` folder that contains `sim.py`).
 
 ### 1. Run a file of commands
 
@@ -106,7 +115,7 @@ Expected output:
 test_transcripts (tests.test_sim.TranscriptTest.test_transcripts) ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.3s
+Ran 1 test in 0.301s
 
 OK
 ```
